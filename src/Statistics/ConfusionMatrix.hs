@@ -70,13 +70,13 @@ isMatrix xs@(x:_) = all ((==n) . length) xs
 matrixDim :: [[Int]] -> (Int,Int)
 matrixDim xs@(x:_) = (length x,length xs)
 
--- takes two annotation lists and computes the confusion matrix
--- xs: gold list, ys: list to be evaluated
+-- takes two prediction lists and computes the confusion matrix
+-- xs: system prediction, ys: gold predictions
 -- rows: outputs ys, columns: outputs xs (gold)
 comparePredictions :: (Eq a) => [a] -> [a] -> ConfMatrix a
 comparePredictions xs ys
   | length vs > 16 = error "comparePredictions: too many categories"
-  | otherwise      = CM vs [[count v1 v2 | v1 <- vs] | v2 <- vs]
+  | otherwise      = CM vs [[count v1 v2 | v2 <- vs] | v1 <- vs]
   where zs = zip xs ys
         n  = length zs
         vs = nub (xs ++ ys)
@@ -98,7 +98,6 @@ matrixSum = sum . map sum
 addCounts :: BinaryConfMatrix -> BinaryConfMatrix -> BinaryConfMatrix
 addCounts (BCM tp1 fp1 fn1 tn1) (BCM tp2 fp2 fn2 tn2) =
   BCM (tp1+tp2) (fp1+fp2) (fn1+fn2) (tn1+tn2)
---sumTable (CM cs t1) (CM _ t2) = CM cs $ zipWith (zipWith (+)) t1 t2
 
 twoWay :: (Eq a) => a -> ConfMatrix a -> BinaryConfMatrix
 twoWay c (CM cs t) = case findIndex (==c) cs of
