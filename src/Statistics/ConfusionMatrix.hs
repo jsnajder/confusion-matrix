@@ -14,7 +14,8 @@ module Statistics.ConfusionMatrix (
   BinaryConfMatrix,
   confMatrix,
   binaryConfMatrix,
-  comparePredictions,
+  evalPredictions,
+  evalBinaryPredictions,
   twoWay,
   accuracy,
   precision,
@@ -28,6 +29,8 @@ module Statistics.ConfusionMatrix (
   microF1,
   precisionOf,
   recallOf,
+  sensitivityOf,
+  specificityOf,
   fMeasureOf,
   f1Of,
   macroPrecision,
@@ -72,9 +75,9 @@ matrixDim xs@(x:_) = (length x,length xs)
 
 -- takes two prediction lists and computes the confusion matrix
 -- xs: system prediction, ys: gold predictions
--- rows: outputs ys, columns: outputs xs (gold)
-comparePredictions :: (Eq a) => [a] -> [a] -> ConfMatrix a
-comparePredictions xs ys
+-- rows: outputs xs (gold), columns: outputs ys (gold)
+evalPredictions :: (Eq a) => [a] -> [a] -> ConfMatrix a
+evalPredictions xs ys
   | length vs > 16 = error "comparePredictions: too many categories"
   | otherwise      = CM vs [[count v1 v2 | v2 <- vs] | v1 <- vs]
   where zs = zip xs ys
@@ -83,8 +86,8 @@ comparePredictions xs ys
         count a b = length $ filter (\(x,y) -> x==a && y==b) zs
 
 -- 'c' is the positive class
-compareBinaryPredictions :: Eq a => a -> [a] -> [a] -> BinaryConfMatrix
-compareBinaryPredictions c xs = twoWay c . comparePredictions xs
+evalBinaryPredictions :: Eq a => a -> [a] -> [a] -> BinaryConfMatrix
+evalBinaryPredictions c xs = twoWay c . evalPredictions xs
        
 rowSums :: (Num a) => [[a]] -> [a]
 rowSums = map sum
