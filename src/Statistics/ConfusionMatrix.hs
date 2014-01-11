@@ -3,13 +3,38 @@
  Statistics.ConfusionMatrix
  Basic performance measures derived from a confusion matrix
 
- (c) 2013 Jan Snajder <jan.snajder@fer.hr>
+ (c) 2014 Jan Snajder <jan.snajder@fer.hr>
 
 -------------------------------------------------------------------------------}
 
 -- TODO: conf. intervals, ...
 
-module Statistics.ConfusionMatrix where
+module Statistics.ConfusionMatrix (
+  ConfMatrix,
+  BinaryConfMatrix,
+  confMatrix,
+  binaryConfMatrix,
+  comparePredictions,
+  twoWay,
+  accuracy,
+  precision,
+  recall,
+  sensitivity,
+  specificity,
+  fMeasure,
+  f1,
+  microConfMatrix,
+  microFMeasure,
+  microF1,
+  precisionOf,
+  recallOf,
+  fMeasureOf,
+  f1Of,
+  macroPrecision,
+  macroRecall,
+  macroFMeasure,
+  macroF1,
+  kappa) where
 
 import Control.Applicative
 import Data.List
@@ -67,8 +92,8 @@ rowSums = map sum
 columnSums :: (Num a) => [[a]] -> [a]
 columnSums = rowSums . transpose
 
-tableSum :: (Num a) => [[a]] -> a
-tableSum = sum . map sum
+matrixSum :: (Num a) => [[a]] -> a
+matrixSum = sum . map sum
 
 addCounts :: BinaryConfMatrix -> BinaryConfMatrix -> BinaryConfMatrix
 addCounts (BCM tp1 fp1 fn1 tn1) (BCM tp2 fp2 fn2 tn2) =
@@ -82,7 +107,7 @@ twoWay c (CM cs t) = case findIndex (==c) cs of
     where tp = t!!i!!i
           fp = sum (t!!i) - tp
           fn = sum ((transpose t)!!i) - tp
-          tn = tableSum t - tp - fp - fn
+          tn = matrixSum t - tp - fp - fn
 
 accuracy :: BinaryConfMatrix -> Double
 accuracy (BCM tp fp fn tn) = 
@@ -128,6 +153,12 @@ precisionOf c = precision . twoWay c
 
 recallOf :: Eq a => a -> ConfMatrix a -> Double
 recallOf c = recall . twoWay c
+
+sensitivityOf :: Eq a => a -> ConfMatrix a -> Double
+sensitivityOf c = sensitivity . twoWay c
+
+specificityOf :: Eq a => a -> ConfMatrix a -> Double
+specificityOf c = specificity . twoWay c
 
 fMeasureOf :: Eq a => Double -> a -> ConfMatrix a -> Double
 fMeasureOf b c = fMeasure b . twoWay c
