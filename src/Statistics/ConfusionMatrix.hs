@@ -14,8 +14,10 @@ module Statistics.ConfusionMatrix (
   BinaryConfMatrix,
   confMatrix,
   binaryConfMatrix,
+  numInstances,
   evalPredictions,
   evalBinaryPredictions,
+  majorityClassifier,
   twoWay,
   accuracy,
   precision,
@@ -25,6 +27,11 @@ module Statistics.ConfusionMatrix (
   fMeasure,
   f1,
   microConfMatrix,
+  microAccuracy,
+  microPrecision,
+  microRecall,
+  microSensitivity,
+  microSpecificity,
   microFMeasure,
   microF1,
   precisionOf,
@@ -33,14 +40,17 @@ module Statistics.ConfusionMatrix (
   specificityOf,
   fMeasureOf,
   f1Of,
+  macroAccuracy,
   macroPrecision,
   macroRecall,
+  macroSensitivity,
+  macroSpecificity,
   macroFMeasure,
   macroF1,
   kappa) where
 
-import Control.Applicative
 import Data.List
+import Data.Ord
 
 data ConfMatrix a = CM {
   labels :: [a],
@@ -85,10 +95,21 @@ evalPredictions xs ys
         vs = nub (xs ++ ys)
         count a b = length $ filter (\(x,y) -> x==a && y==b) zs
 
--- 'c' is the positive class
-evalBinaryPredictions :: Eq a => a -> [a] -> [a] -> BinaryConfMatrix
-evalBinaryPredictions c xs = twoWay c . evalPredictions xs
-       
+-- 'True' is the positive class
+evalBinaryPredictions :: [Bool] -> [Bool] -> BinaryConfMatrix
+evalBinaryPredictions xs = twoWay True . evalPredictions xs
+
+majorityClassifier :: ConfMatrix a -> ConfMatrix a
+majorityClassifier (CM cs m) = 
+  CM cs $ replicate i zs ++ [xs] ++ replicate (n-i-1) zs
+  where xs = columnSums m
+        i  = fst . maximumBy (comparing snd) $ zip [0..] xs
+        zs = replicate n 0
+        (n,_) = matrixDim m
+
+numInstances :: ConfMatrix a -> Int
+numInstances (CM _ m) = matrixSum m
+ 
 rowSums :: (Num a) => [[a]] -> [a]
 rowSums = map sum
 
@@ -103,13 +124,13 @@ addCounts (BCM tp1 fp1 fn1 tn1) (BCM tp2 fp2 fn2 tn2) =
   BCM (tp1+tp2) (fp1+fp2) (fn1+fn2) (tn1+tn2)
 
 twoWay :: (Eq a) => a -> ConfMatrix a -> BinaryConfMatrix
-twoWay c (CM cs t) = case findIndex (==c) cs of
+twoWay c (CM cs m) = case findIndex (==c) cs of
   Nothing -> error "twoWay: category does not exist"
   Just i  -> BCM tp fp fn tn
-    where tp = t!!i!!i
-          fp = sum (t!!i) - tp
-          fn = sum ((transpose t)!!i) - tp
-          tn = matrixSum t - tp - fp - fn
+    where tp = m!!i!!i
+          fp = sum (m!!i) - tp
+          fn = sum ((transpose m)!!i) - tp
+          tn = matrixSum m - tp - fp - fn
 
 accuracy :: BinaryConfMatrix -> Double
 accuracy (BCM tp fp fn tn) = 
@@ -123,12 +144,13 @@ recall :: BinaryConfMatrix -> Double
 recall (BCM tp _ fn _) = 
   realToFrac tp / (realToFrac tp + realToFrac fn)
 
+-- equals recall
 sensitivity :: BinaryConfMatrix -> Double
 sensitivity = recall
 
 specificity :: BinaryConfMatrix -> Double
 specificity (BCM _ fp fn tn) = 
-  realToFrac tn / realToFrac (fp + fn)
+  realToFrac tn / realToFrac (fp + tn)
 
 -- parametrized F-measure 
 -- b<1 emphasizes precision, b>1 emphasizes recall
@@ -144,11 +166,34 @@ microConfMatrix :: Eq a => ConfMatrix a -> BinaryConfMatrix
 microConfMatrix cm@(CM cs _) = 
   foldr1 addCounts $ map (flip twoWay cm) cs
 
+microAccuracy :: Eq a => ConfMatrix a -> Double
+microAccuracy = accuracy . microConfMatrix
+
+microPrecision :: Eq a => ConfMatrix a -> Double
+microPrecision = precision . microConfMatrix
+
+-- equals microPrecision
+microRecall :: Eq a => ConfMatrix a -> Double
+microRecall = recall . microConfMatrix
+
+-- equals microPrecision
+microSensitivity :: Eq a => ConfMatrix a -> Double
+microSensitivity = sensitivity . microConfMatrix
+
+-- equals microPrecision
+microSpecificity :: Eq a => ConfMatrix a -> Double
+microSpecificity = specificity . microConfMatrix
+
+-- equals microPrecision (for all values of b)
 microFMeasure :: Eq a => Double -> ConfMatrix a -> Double
 microFMeasure b = fMeasure b . microConfMatrix 
 
+-- equals microPrecision
 microF1 :: Eq a => ConfMatrix a -> Double
 microF1 = microFMeasure 1
+
+accuracyOf :: Eq a => a -> ConfMatrix a -> Double
+accuracyOf c = accuracy . twoWay c
 
 precisionOf :: Eq a => a -> ConfMatrix a -> Double
 precisionOf c = precision . twoWay c
@@ -168,11 +213,21 @@ fMeasureOf b c = fMeasure b . twoWay c
 f1Of :: Eq a => a -> ConfMatrix a -> Double
 f1Of = fMeasureOf 1
 
+-- equals microAccuracy
+macroAccuracy :: Eq a => ConfMatrix a -> Double
+macroAccuracy cm@(CM cs _) = avg $ map (flip accuracyOf cm) cs
+
 macroPrecision :: Eq a => ConfMatrix a -> Double
-macroPrecision cm@(CM cs _) = avg $ map (\c -> precisionOf c cm) cs
+macroPrecision cm@(CM cs _) = avg $ map (flip precisionOf cm) cs
 
 macroRecall :: Eq a => ConfMatrix a -> Double
-macroRecall cm@(CM cs _) = avg $ map (\c -> recallOf c cm) cs
+macroRecall cm@(CM cs _) = avg $ map (flip recallOf cm) cs
+
+macroSensitivity :: Eq a => ConfMatrix a -> Double
+macroSensitivity cm@(CM cs _) = avg $ map (flip sensitivityOf cm) cs
+
+macroSpecificity :: Eq a => ConfMatrix a -> Double
+macroSpecificity cm@(CM cs _) = avg $ map (flip specificityOf cm) cs
 
 macroFMeasure :: Eq a => Double -> ConfMatrix a -> Double
 macroFMeasure b cm@(CM cs _) = avg $ map (\c -> fMeasureOf b c cm) cs
