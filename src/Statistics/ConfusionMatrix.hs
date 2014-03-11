@@ -52,23 +52,29 @@ module Statistics.ConfusionMatrix (
 import Data.List
 import Data.Ord
 
+-- | Multiclass confusion matrix.
 data ConfMatrix a = CM {
   labels :: [a],
   matrix :: [[Int]] } deriving (Show,Read,Eq,Ord)
 
+-- | Binary confusion matrix.
 data BinaryConfMatrix = BCM {
   tp :: Int,
   fp :: Int,
   fn :: Int,
   tn :: Int } deriving (Show,Read,Eq,Ord)
 
--- confusion matrix with default category labels 1, 2, ...
+-- | Builds a multiclass confusion matrix. Indices @1@, @2@, etc. are used as
+-- category labels.
 confMatrix :: [[Int]] -> ConfMatrix Int
 confMatrix xs
   | isMatrix xs && n == m && n > 1 = CM [1..n] xs
   | otherwise = error "confMatrix: not an NxN matrix (N>=2)"
   where (n,m) = matrixDim xs
 
+-- | Builds a binary confusion matrix from a list @[[TP,FN],[FP,TN]]@, where
+-- @TP@, @FN@, @FP@, and @TN@ are the true positives, the false positives, the
+-- false negatives, and the true negatives, respectively.
 binaryConfMatrix :: [[Int]] -> BinaryConfMatrix
 binaryConfMatrix xs
   | isMatrix xs && n==m && n == 2 = twoWay 1 $ confMatrix xs
@@ -83,19 +89,27 @@ isMatrix xs@(x:_) = all ((==n) . length) xs
 matrixDim :: [[Int]] -> (Int,Int)
 matrixDim xs@(x:_) = (length x,length xs)
 
--- takes two prediction lists and computes the confusion matrix
--- xs: system prediction, ys: gold predictions
--- rows: outputs xs (gold), columns: outputs ys (gold)
-evalPredictions :: (Eq a) => [a] -> [a] -> ConfMatrix a
+-- | Computes the confusion matrix by comparing model predictions (first list) 
+-- against gold predictions (second list).
+-- @
+-- evalPredictions "aabbcc" "abbbcc" == confusionMatrix
+-- [[1,0,0],[1,2,0],[0,0,2]]
+-- @
+evalPredictions :: (Eq a, Ord a) => [a] -> [a] -> ConfMatrix a
 evalPredictions xs ys
   | length vs > 16 = error "comparePredictions: too many categories"
-  | otherwise      = CM vs [[count v1 v2 | v2 <- vs] | v1 <- vs]
+  | otherwise      = CM vs [[count v1 v2 | v1 <- vs] | v2 <- vs]
   where zs = zip xs ys
         n  = length zs
-        vs = nub (xs ++ ys)
+        vs = sort $ nub (xs ++ ys)
         count a b = length $ filter (\(x,y) -> x==a && y==b) zs
 
--- 'True' is the positive class
+-- | Same as 'evalPredictions' but for binary (boolean) predictions. 
+-- 'True' is considered as positive class.
+-- @
+-- evalPredictions [True,True,False] [True,False,False] == binaryConfMatrix
+-- [[1,0],[1,1]]
+-- @
 evalBinaryPredictions :: [Bool] -> [Bool] -> BinaryConfMatrix
 evalBinaryPredictions xs = twoWay True . evalPredictions xs
 
@@ -128,8 +142,8 @@ twoWay c (CM cs m) = case findIndex (==c) cs of
   Nothing -> error "twoWay: category does not exist"
   Just i  -> BCM tp fp fn tn
     where tp = m!!i!!i
-          fp = sum (m!!i) - tp
-          fn = sum ((transpose m)!!i) - tp
+          fn = sum (m!!i) - tp
+          fp = sum ((transpose m)!!i) - tp
           tn = matrixSum m - tp - fp - fn
 
 accuracy :: BinaryConfMatrix -> Double
@@ -238,8 +252,8 @@ macroF1 = macroFMeasure 1
 avg :: Fractional a => [a] -> a
 avg xs = sum xs / (realToFrac $ length xs)
 
--- takes an NxN confusion matrix and computes the kappa 
--- coefficient and the standard error
+-- | Takes a confusion matrix and computes the kappa coefficient and 
+-- the standard error.
 kappa :: ConfMatrix a -> (Double,Double)
 kappa (CM _ xss) = (k,se)
   where 

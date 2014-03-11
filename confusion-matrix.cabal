@@ -20,3 +20,9 @@ library
   -- other-modules:       
   build-depends:       base ==4.6.*
   hs-source-dirs:      src
+
+executable evalPredictions
+  build-depends:       base ==4.6.*, parseargs ==0.1.*
+  hs-source-dirs:      src
+  main-is:             evalPredictions.hs
+
